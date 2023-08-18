@@ -11,39 +11,69 @@ export default function Home() {
     //@ts-ignore
     fileInputRef.current.click()
   }
-  const uploadFile=(event:any)=>{
-    const file=event.target.files[0]
-    if(!file) return;
-    const filename=file.name.length>12?`${file.name.substring(0,13)}... .${file.name.split('.')[1]}`:file.name;
-    const formdata=new FormData();
-    formdata.append('file',file)
-    //@ts-ignore
-    setFiles(prevState=>[...prevState,{name:filename,loading:0}])
-    setShowProgress(true)
-    axios.post('http://localhost:5000/',formdata,{
-      onUploadProgress:({loaded,total})=>{
-        setFiles(prevState=>{
-          const newFiles=[...prevState];
-          //@ts-ignore
-          newFiles[newFiles.length-1].loading=Math.floor((loaded/total)*100)
-          return newFiles
-        })
-        if(loaded==total){
-          const filesize=total<1024?`${total} KB`:`${(loaded/(1024*1024)).toFixed(2)} MB`
-          //@ts-ignore
-          setUploadedFiles([...uploadedFiles,{name:filename,size:filesize}])
-          setFiles([])
-          setShowProgress(false)
+  const uploadFile = async (event:any) => {
+    const files = event.target.files;
+    if (files.length === 0) return;
+//@ts-ignore
+    setFiles((prevState) => [
+      ...prevState,
+      ...Array.from(files).map((file) => ({
+        name:
+        //@ts-ignore
+          file.name.length > 12
+//@ts-ignore
+          ? `${file.name.substring(0, 13)}... .${file.name.split('.')[1]}`
+          //@ts-ignore  
+          : file.name,
+        loading: 0,
+      })),
+    ]);
+    setShowProgress(true);
 
-        }
-      },
-    }).catch(console.error)
-  }
+    const uploadPromises = Array.from(files).map(async (file) => {
+      const formData = new FormData();
+      //@ts-ignore
+      formData.append('file', file);
+
+      return axios.post('http://localhost:5000/', formData, {
+        onUploadProgress: ({ loaded, total }) => {
+          setFiles((prevState) => {
+            const newFiles = [...prevState];
+            //@ts-ignore
+            const index = newFiles.findIndex((f) => f.name === file.name);
+            if (index !== -1) {
+              //@ts-ignore
+              newFiles[index].loading = Math.floor((loaded / total) * 100);
+            }
+            return newFiles;
+          });
+        },
+      });
+    });
+
+    try {
+      await Promise.all(uploadPromises);
+
+      const uploadedFilesData = Array.from(files).map((file) => ({
+        //@ts-ignore
+        name: file.name,
+        //@ts-ignore
+        size: file.size < 1024 ? `${file.size} KB` : `${(file.size / (1024 * 1024)).toFixed(2)} MB`,
+      }));
+//@ts-ignore
+      setUploadedFiles([...uploadedFiles, ...uploadedFilesData]);
+      setFiles([]);
+      setShowProgress(false);
+    } catch (error) {
+      console.error('Upload error:', error);
+      setShowProgress(false);
+    }
+  };
   return (
       <div className="upload-box">
         <p>Upload your file</p>
        <form>
-        <input className='file-input' type="file" name='file' hidden ref={fileInputRef} onChange={uploadFile}/>
+        <input className='file-input' type="file" name='file' hidden ref={fileInputRef} multiple onChange={uploadFile}/>
         <div className='icon' onClick={fileHandleInputClick}>
           <img src="uploadfile.svg"/>
           </div>
