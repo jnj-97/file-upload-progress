@@ -27,6 +27,16 @@ app.post("/", upload.single("file"),async (req, res) => {
   // Process the uploaded file
   const filename = file.originalname;
   const filesize = file.size;
+  if(!(fs.existsSync("./files")))
+  {
+    fs.mkdir('./files',(err)=>
+    {
+      if(err)
+      {
+        console.log(err);
+      }
+    });
+  }
   const filepath = path.join(__dirname, "files", filename);
   fs.writeFileSync(filepath, file.buffer);
 
