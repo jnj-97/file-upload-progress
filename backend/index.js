@@ -7,6 +7,7 @@ const path = require("path"); // Import the path module
 const app = express();
 const port = 5000;
 const passport = require("passport");
+const IPFS = require('./services/ipfs.service');
 
 app.use(cors());
 app.use(passport.initialize());
@@ -16,7 +17,7 @@ app.use(express.json());
 const storage = multer.memoryStorage(); // Store files in memory
 const upload = multer({ storage });
 
-app.post("/", upload.single("file"), (req, res) => {
+app.post("/", upload.single("file"),async (req, res) => {
   const file = req.file;
 
   if (!file) {
@@ -27,15 +28,28 @@ app.post("/", upload.single("file"), (req, res) => {
   const filename = file.originalname;
   const filesize = file.size;
   const filepath = path.join(__dirname, "files", filename);
-  fs.writeFile(filepath, file.buffer, (err) => {
-    if (err) {
-      console.error("Error saving file:", err);
-      return res.status(500).json({ error: "Failed to save the file" });
-    }
-  });
-  // Perform any other processing you need to do here
-  res.json({ message: "File uploaded successfully", filename, filesize });
+  fs.writeFileSync(filepath, file.buffer);
+
+  try {
+    let cid = await IPFS.prototype.uploadImage(filepath);
+    console.log(cid);
+
+    // Unlink the file after a successful IPFS upload
+    //fs.unlinkSync(filepath);
+
+    // Perform any other processing you need to do here
+    res.json({ message: "File uploaded successfully", filename, filesize });
+  } catch (err) {
+    console.error("Error uploading to IPFS:", err);
+
+    // Unlink the file in case of an error during IPFS upload
+    // fs.unlinkSync(filepath);
+
+    return res.status(500).json({ error: "Failed to upload the file to IPFS" });
+  }
 });
+
+
 require("./config/passport.config")(passport);
 app.use('/',require('./routes/login.routes'));
 app.listen(port, () => {
